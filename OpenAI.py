@@ -1,4 +1,4 @@
-# client = OpenAI(api_key="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")  # 여기에 API 키 입력
+# client = OpenAI(api_key=os.getenv("OPENAI_API_KEY", "YOUR_OPENAI_API_KEY"))  # 여기에 API 키 입력
 from openai import OpenAI
 from gtts import gTTS
 import ffmpeg
@@ -6,7 +6,7 @@ import os
 import shlex
 
 # 1️⃣ OpenAI GPT 설정
-client = OpenAI(api_key="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")  # 여기에 API 키 입력
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY", "YOUR_OPENAI_API_KEY"))  # 여기에 API 키 입력
 
 # 2️⃣ GPT 프롬프트 (촬영 기사 스타일로 응답 유도)
 scene_description = "바다의 잔잔한 파도를 촬영합니다."

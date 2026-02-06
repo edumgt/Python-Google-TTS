@@ -13,7 +13,7 @@ SERVICE_ACCOUNT_FILE = "my-project.json"
 client = texttospeech.TextToSpeechClient.from_service_account_file(SERVICE_ACCOUNT_FILE)
 voice_names = ["ko-KR-Wavenet-A", "ko-KR-Wavenet-B", "ko-KR-Wavenet-C", "ko-KR-Wavenet-D"]
 
-openai_client = OpenAI(api_key="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")  # ← 수정 필요
+openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY", "YOUR_OPENAI_API_KEY"))  # ← 수정 필요
 base_directory = r"C:\\devops\\python-gen-java-edu\\Exercises"
 output_folder = "output_exercise_lectures"
 

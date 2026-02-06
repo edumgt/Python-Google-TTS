@@ -8,7 +8,7 @@ import ast
 import re
 
 # 🔐 OpenAI API 설정
-client = OpenAI(api_key="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") 
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY", "YOUR_OPENAI_API_KEY")) 
 
 # 🎼 GPT로 8화음 시퀀스 8개 요청
 response = client.chat.completions.create(
