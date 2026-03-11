@@ -169,6 +169,10 @@ docker compose down
 
 ## 1) 권장 AWS 아키텍처 구성도
 
+아래 SVG 구성도는 AWS 리소스 아이콘이 또렷하게 보이도록 제작했습니다.
+
+![AWS Architecture Diagram](docs/aws-architecture-diagram.svg)
+
 ```mermaid
 flowchart TB
     U[사용자/클라이언트] --> R53[Route 53\nDNS]

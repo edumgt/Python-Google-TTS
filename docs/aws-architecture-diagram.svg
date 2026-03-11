@@ -1,0 +1,173 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1680" height="980" viewBox="0 0 1680 980" role="img" aria-labelledby="title desc">
+  <title id="title">Voice Analyzer AWS Architecture</title>
+  <desc id="desc">AWS deployment architecture diagram for Django + FastAPI Voice Analyzer with visible resource icons.</desc>
+  <defs>
+    <style>
+      .title { font: 700 30px 'Segoe UI', Arial, sans-serif; fill: #0f172a; }
+      .subtitle { font: 500 16px 'Segoe UI', Arial, sans-serif; fill: #334155; }
+      .label { font: 600 16px 'Segoe UI', Arial, sans-serif; fill: #0f172a; }
+      .small { font: 500 13px 'Segoe UI', Arial, sans-serif; fill: #334155; }
+      .zone { fill: #f8fafc; stroke: #94a3b8; stroke-width: 2; stroke-dasharray: 8 6; }
+      .box { fill: #ffffff; stroke: #475569; stroke-width: 2; rx: 18; ry: 18; }
+      .edge { stroke: #1e293b; stroke-width: 2.5; fill: none; marker-end: url(#arrow); }
+      .aws { fill: #ff9900; }
+      .icon-line { stroke: #0f172a; stroke-width: 2.2; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+    </style>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#1e293b"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1680" height="980" fill="#eef2ff"/>
+  <text x="50" y="60" class="title">AI Django + FastAPI Voice Analyzer - AWS Architecture</text>
+  <text x="50" y="90" class="subtitle">Production-ready deployment with ECS Fargate, data stores, queue, and observability</text>
+
+  <rect x="180" y="150" width="1260" height="760" class="zone"/>
+  <text x="210" y="190" class="label">VPC (Multi-AZ)</text>
+
+  <rect x="220" y="220" width="1240" height="210" class="zone"/>
+  <text x="250" y="255" class="label">Public Subnet</text>
+
+  <rect x="220" y="470" width="1240" height="400" class="zone"/>
+  <text x="250" y="505" class="label">Private Subnet</text>
+
+  <g transform="translate(40,250)">
+    <rect class="box" x="0" y="0" width="180" height="120"/>
+    <circle cx="45" cy="45" r="24" class="aws"/>
+    <path d="M30 45h30M45 30v30" class="icon-line"/>
+    <text x="90" y="45" class="label">User</text>
+    <text x="90" y="70" class="small">Client</text>
+  </g>
+
+  <g transform="translate(270,260)">
+    <rect class="box" x="0" y="0" width="210" height="130"/>
+    <rect x="22" y="25" width="42" height="42" rx="8" class="aws"/>
+    <path d="M30 45h26M43 32v26" class="icon-line"/>
+    <text x="78" y="47" class="label">Route 53</text>
+    <text x="78" y="72" class="small">DNS</text>
+  </g>
+
+  <g transform="translate(540,260)">
+    <rect class="box" x="0" y="0" width="230" height="130"/>
+    <circle cx="42" cy="46" r="22" class="aws"/>
+    <path d="M24 46h36M42 28v36" class="icon-line"/>
+    <text x="78" y="47" class="label">CloudFront</text>
+    <text x="78" y="72" class="small">CDN + TLS</text>
+  </g>
+
+  <g transform="translate(840,250)">
+    <rect class="box" x="0" y="0" width="250" height="145"/>
+    <rect x="24" y="30" width="40" height="34" rx="7" class="aws"/>
+    <path d="M22 72h44M30 84h28" class="icon-line"/>
+    <text x="82" y="52" class="label">ALB</text>
+    <text x="82" y="76" class="small">Application Load Balancer</text>
+  </g>
+
+  <g transform="translate(1160,255)">
+    <rect class="box" x="0" y="0" width="250" height="140"/>
+    <rect x="24" y="28" width="44" height="44" rx="8" class="aws"/>
+    <path d="M30 50h32M46 34v32" class="icon-line"/>
+    <text x="82" y="52" class="label">NAT Gateway</text>
+    <text x="82" y="77" class="small">Outbound Internet</text>
+  </g>
+
+  <g transform="translate(290,560)">
+    <rect class="box" x="0" y="0" width="280" height="165"/>
+    <rect x="26" y="36" width="48" height="38" rx="8" class="aws"/>
+    <path d="M24 82h52M32 94h36" class="icon-line"/>
+    <text x="92" y="58" class="label">ECS Fargate Service</text>
+    <text x="92" y="83" class="small">Django + FastAPI</text>
+    <text x="92" y="105" class="small">Uvicorn ASGI App</text>
+  </g>
+
+  <g transform="translate(620,560)">
+    <rect class="box" x="0" y="0" width="250" height="165"/>
+    <circle cx="45" cy="53" r="24" class="aws"/>
+    <path d="M29 53h32M45 37v32" class="icon-line"/>
+    <text x="85" y="58" class="label">Background Worker</text>
+    <text x="85" y="84" class="small">ECS Task / Lambda</text>
+  </g>
+
+  <g transform="translate(920,550)">
+    <rect class="box" x="0" y="0" width="210" height="145"/>
+    <ellipse cx="42" cy="58" rx="22" ry="16" class="aws"/>
+    <path d="M24 58h36M42 44v28" class="icon-line"/>
+    <text x="78" y="56" class="label">RDS</text>
+    <text x="78" y="81" class="small">PostgreSQL</text>
+  </g>
+
+  <g transform="translate(1170,550)">
+    <rect class="box" x="0" y="0" width="220" height="145"/>
+    <rect x="25" y="34" width="38" height="44" rx="7" class="aws"/>
+    <path d="M25 58h38M44 34v44" class="icon-line"/>
+    <text x="78" y="56" class="label">ElastiCache</text>
+    <text x="78" y="81" class="small">Redis</text>
+  </g>
+
+  <g transform="translate(300,760)">
+    <rect class="box" x="0" y="0" width="240" height="130"/>
+    <rect x="25" y="32" width="42" height="38" rx="8" class="aws"/>
+    <path d="M25 60h42M46 32v38" class="icon-line"/>
+    <text x="82" y="56" class="label">SQS</text>
+    <text x="82" y="81" class="small">Async Queue</text>
+  </g>
+
+  <g transform="translate(590,760)">
+    <rect class="box" x="0" y="0" width="240" height="130"/>
+    <path d="M36 38h30l8 10v26H36z" class="aws"/>
+    <path d="M36 74h38" class="icon-line"/>
+    <text x="88" y="56" class="label">S3</text>
+    <text x="88" y="81" class="small">Audio / Analysis Files</text>
+  </g>
+
+  <g transform="translate(880,760)">
+    <rect class="box" x="0" y="0" width="260" height="130"/>
+    <rect x="27" y="32" width="44" height="44" rx="8" class="aws"/>
+    <path d="M35 54h28M49 40v28" class="icon-line"/>
+    <text x="88" y="56" class="label">Secrets Manager</text>
+    <text x="88" y="81" class="small">OpenAI API Key</text>
+  </g>
+
+  <g transform="translate(1180,760)">
+    <rect class="box" x="0" y="0" width="250" height="130"/>
+    <circle cx="43" cy="53" r="22" class="aws"/>
+    <path d="M27 53h32M43 37v32" class="icon-line"/>
+    <text x="82" y="56" class="label">CloudWatch</text>
+    <text x="82" y="81" class="small">Logs / Metrics</text>
+  </g>
+
+  <g transform="translate(1460,550)">
+    <rect class="box" x="0" y="0" width="180" height="145"/>
+    <rect x="20" y="34" width="38" height="38" rx="7" class="aws"/>
+    <path d="M20 72h38" class="icon-line"/>
+    <text x="68" y="56" class="label">ECR</text>
+    <text x="68" y="81" class="small">Images</text>
+  </g>
+
+  <g transform="translate(1460,760)">
+    <rect class="box" x="0" y="0" width="180" height="130"/>
+    <rect x="20" y="30" width="38" height="38" rx="7" class="aws"/>
+    <path d="M20 68h38" class="icon-line"/>
+    <text x="68" y="52" class="label">GitHub Actions</text>
+    <text x="68" y="78" class="small">CI/CD</text>
+  </g>
+
+  <path class="edge" d="M220 310 L270 325"/>
+  <path class="edge" d="M480 325 L540 325"/>
+  <path class="edge" d="M770 325 L840 325"/>
+  <path class="edge" d="M1090 325 L1160 325"/>
+  <path class="edge" d="M960 395 L430 560"/>
+  <path class="edge" d="M430 725 L430 760"/>
+  <path class="edge" d="M570 640 L620 640"/>
+  <path class="edge" d="M570 610 L920 620"/>
+  <path class="edge" d="M570 660 L1170 620"/>
+  <path class="edge" d="M570 700 L590 790"/>
+  <path class="edge" d="M870 640 L920 640"/>
+  <path class="edge" d="M870 675 L590 810"/>
+  <path class="edge" d="M870 700 L1180 790"/>
+  <path class="edge" d="M870 625 L880 810"/>
+  <path class="edge" d="M1550 760 L1550 695"/>
+  <path class="edge" d="M1460 620 L570 610"/>
+
+  <text x="1280" y="220" class="small">Legend: Orange icons = AWS resources</text>
+</svg>
