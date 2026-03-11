@@ -1,117 +1,146 @@
-# Python Gen Java Edu
+# Django + FastAPI GitHub Repo Voice Analyzer
 
-Java 소스 코드를 자동 분석하고, 설명 텍스트/음성/영상까지 생성하는 **교육용 콘텐츠 자동화 프로젝트**입니다.
+입력한 GitHub public 저장소 URL을 기준으로:
+1. 저장소를 로컬 폴더에 클론
+2. OpenAI로 코드 구조/기술 내용을 분석
+3. 분석 내용을 OpenAI TTS로 MP3 파일 생성
 
-## 1) 프로젝트 개요
-- Java 예제 파일을 스캔하고 코드 구조를 분석합니다.
-- OpenAI 모델로 Java 코드 요약/설명을 생성합니다.
-- Google Cloud Text-to-Speech로 한국어 음성을 생성합니다.
-- ffmpeg/Pillow를 사용해 텍스트 오버레이 영상이나 슬라이드형 영상을 합성합니다.
-- 일부 스크립트는 Diffusers + PyTorch 기반 Text-to-Video 실험 기능을 포함합니다.
+을 자동 처리하는 웹 애플리케이션입니다.
 
----
+## 프로젝트 개요
+- 목적: 개발자가 GitHub 공개 저장소를 빠르게 이해할 수 있도록 코드 분석 결과를 텍스트와 음성으로 제공
+- 입력: GitHub public 저장소 URL (`https://github.com/{owner}/{repo}`)
+- 처리: 저장소 클론, 핵심 파일 샘플링, LLM 기술 분석, 내레이션 스크립트 생성, MP3 변환
+- 출력: 분석 텍스트(`.md`)와 음성 파일(`.mp3`), 웹 UI에서 재생/다운로드 링크 제공
 
-## 2) 기술 스택 (상세)
+## 기술 스택
+- Language: `Python 3`
+- Web UI: `Django`
+- API Layer: `FastAPI`
+- ASGI Server: `Uvicorn`
+- AI Analysis/TTS: `OpenAI API` (`chat.completions`, `audio.speech`)
+- Repo Ingestion: `git clone --depth 1`
+- Config: `.env`, `python-dotenv`
+- Storage: 로컬 파일시스템 (`workspace_repos/`, `media/outputs/`)
 
-### 언어/런타임
-- **Python 3.x**
+## 아키텍처
+- `Django`: 웹 화면(UI) 제공
+- `FastAPI`: `/api/*` 분석 API 제공
+- `OpenAI API`: 코드 분석 + 음성 생성
 
-### AI/LLM
-- **OpenAI Python SDK (`openai`)**
-  - Java 코드 분석 요약
-  - 설명 문장 생성
-  - 교육용 스크립트 생성
+FastAPI 앱에서 Django ASGI 앱을 `/`에 마운트해 단일 서버로 실행합니다.
 
-### 음성(TTS)
-- **Google Cloud Text-to-Speech (`google-cloud-texttospeech`)**
-  - 한국어 WaveNet 음성 생성
-- **gTTS (`gtts`)**
-  - 간단한 텍스트 음성 변환
-
-### 영상/오디오 처리
-- **ffmpeg-python (`ffmpeg`)**
-  - 배경 영상 생성
-  - 텍스트 오버레이
-  - 오디오/비디오 mux
-  - 필터(리버브 등) 적용
-- **pydub**
-  - WAV → MP3 변환
-- **mutagen**
-  - MP3 길이 메타데이터 조회
-- **scipy / numpy**
-  - 오디오 파형 합성 및 저장
-
-### 이미지 처리
-- **Pillow (`PIL`)**
-  - 자막/텍스트 이미지 생성
-
-### 비디오 생성(실험)
-- **PyTorch (`torch`)**
-- **Diffusers (`diffusers`)**
-- **imageio**
-- **OpenCV (`cv2`)**
-  - 텍스트 기반 비디오 생성/프레임 후처리 실험 스크립트
-
-### 데이터/설정
-- **JSON 설정 파일**
-  - OAuth/Service Account 관련 설정
-
----
-
-## 3) 주요 스크립트 역할
-- `work.py`, `batch.py`, `batch2.py`, `singledirwork.py`
-  - Java 파일 단위/디렉토리 단위 분석
-  - OpenAI 요약 + Google TTS + 영상 합성 파이프라인
-- `VoiceToMp3Kr.py`
-  - 한국어 TTS 중심 처리
-- `OpenAI.py`, `OpenAI2.py`
-  - GPT 기반 스토리/사운드 생성 및 ffmpeg 후처리
-- `OpenAI3.py` ~ `OpenAI7.py`
-  - Diffusers/PyTorch 기반 영상 생성 실험
-
----
-
-## 4) 민감정보(Secret) 마스킹 정책
-이 저장소는 보안 강화를 위해 **실제 키/토큰/계정정보를 직접 커밋하지 않도록** 정리되었습니다.
-
-- OpenAI API Key: 코드 내 하드코딩 대신 `OPENAI_API_KEY` 환경변수 사용
-- Google OAuth/Service Account JSON: 실제 값 대신 `***MASKED_...***` 플레이스홀더 사용
-
-### 필수 환경변수
-```bash
-export OPENAI_API_KEY="your-real-openai-key"
+## Mermaid Flow
+```mermaid
+flowchart TD
+    A[사용자: GitHub URL 입력] --> B[Django UI]
+    B --> C[POST /api/analyze]
+    C --> D[URL 검증]
+    D --> E[GitHub Public Repo Clone]
+    E --> F[소스 샘플링/컨텍스트 생성]
+    F --> G[OpenAI 코드 분석 요청]
+    G --> H[분석 텍스트 + 내레이션 스크립트 생성]
+    H --> I[OpenAI TTS MP3 생성]
+    I --> J[/media/outputs 저장]
+    J --> K[결과 JSON 반환]
+    K --> L[웹 UI에서 분석 표시/음성 재생/다운로드]
 ```
 
-### 권장 보안 수칙
-1. `.env` 또는 Secret Manager 사용
-2. `client_secret.json`, `my-project.json` 실제 파일은 Git 추적 제외(`.gitignore`) 처리
-3. 키가 노출되었을 경우 즉시 폐기(rotate) 후 재발급
-4. CI/CD에는 리포지토리 비밀변수로 주입
+## Mermaid Sequence
+```mermaid
+sequenceDiagram
+    actor U as User
+    participant D as Django UI
+    participant F as FastAPI /api/analyze
+    participant G as GitHub
+    participant O as OpenAI API
+    participant S as Local Storage
 
----
+    U->>D: GitHub Public URL 입력 + 분석 요청
+    D->>F: POST /api/analyze {repo_url}
+    F->>F: URL 유효성 검사
+    F->>G: git clone --depth 1
+    G-->>F: 저장소 로컬 복제 완료
+    F->>F: 코드 샘플링/프롬프트 컨텍스트 구성
+    F->>O: 코드 분석 요청 (chat.completions)
+    O-->>F: 분석 텍스트 + 내레이션 스크립트
+    F->>O: 음성 생성 요청 (audio.speech)
+    O-->>F: MP3 바이너리
+    F->>S: 분석(.md), 음성(.mp3) 저장
+    F-->>D: 결과 JSON (text/audio URL)
+    D-->>U: 분석 표시 + 오디오 재생/다운로드
+```
 
-## 5) 실행 전 준비
-1. Python 가상환경 생성
-2. 의존성 설치
-   ```bash
-   pip install openai google-cloud-texttospeech gtts ffmpeg-python pillow mutagen pydub scipy numpy torch diffusers imageio opencv-python
-   ```
-3. 시스템에 ffmpeg 설치
-4. Google Cloud 인증 파일(실제 값) 준비 후 로컬 경로로 연결
+## 프로젝트 구조
+```text
+repo_voice_analyzer/
+  settings.py
+  urls.py
+  asgi.py
+  fastapi_app.py
+dashboard/
+  views.py
+  urls.py
+  templates/dashboard/index.html
+services/
+  pipeline.py
+manage.py
+requirements.txt
+.env.example
+```
 
----
+## 설치
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env
+```
 
-## 6) 현재 구조의 특징
-- 장점
-  - 코드 분석 → 설명 생성 → 음성/영상 산출까지 자동화 범위가 넓음
-  - 교육 콘텐츠 생성 파이프라인 실험에 적합
-- 개선 포인트
-  - 스크립트별 중복 로직(요약/TTS/합성)을 모듈화하면 유지보수성 향상
-  - 의존성 잠금(`requirements.txt`) 및 실행 엔트리포인트 통일 필요
-  - 설정 파일 경로/출력 경로를 CLI 인자로 일반화하면 재사용성 상승
+`.env`에서 `OPENAI_API_KEY`를 반드시 설정하세요.
 
----
+## 실행
+```bash
+uvicorn repo_voice_analyzer.fastapi_app:app --reload --host 0.0.0.0 --port 8000
+```
 
-## 7) 라이선스/주의
-- 외부 API(OpenAI/Google Cloud) 사용 시 과금이 발생할 수 있습니다.
-- 생성형 AI 결과물은 교육용 검수 과정을 거쳐 활용하는 것을 권장합니다.
+브라우저:
+- UI: `http://127.0.0.1:8000/`
+- Health: `http://127.0.0.1:8000/api/health`
+- API Docs: `http://127.0.0.1:8000/docs`
+
+## API 예시
+`POST /api/analyze`
+
+요청:
+```json
+{
+  "repo_url": "https://github.com/openai/openai-python"
+}
+```
+
+응답:
+```json
+{
+  "job_id": "f0f6aee245e644f2a7a7f513b7ea7ac1",
+  "repository": "openai/openai-python",
+  "local_path": "/home/Python-Google-TTS/workspace_repos/openai__openai-python__f0f6aee2",
+  "analysis_text": "...",
+  "narration_text": "...",
+  "audio_url": "/media/outputs/f0f6aee245e644f2a7a7f513b7ea7ac1.mp3",
+  "analysis_url": "/media/outputs/f0f6aee245e644f2a7a7f513b7ea7ac1.md"
+}
+```
+
+## 동작 흐름
+1. GitHub URL 유효성 검사 (`github.com/{owner}/{repo}`만 허용)
+2. `git clone --depth 1`로 로컬 폴더 생성/클론
+3. 코드 파일 일부를 샘플링해 프롬프트 컨텍스트 구성
+4. OpenAI 모델로 기술 분석 + TTS용 내레이션 생성
+5. OpenAI 음성 API로 MP3 파일 생성
+6. `/media/outputs`에 분석 문서/오디오 저장
+
+## 주의사항
+- public 저장소만 지원합니다.
+- 저장소가 너무 크면 분석 시간이 길어질 수 있습니다.
+- OpenAI API 사용 비용이 발생할 수 있습니다.

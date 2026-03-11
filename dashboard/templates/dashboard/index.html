@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GitHub Repo Voice Analyzer</title>
+  <style>
+    :root {
+      --bg: #f2f5f9;
+      --card: #ffffff;
+      --text: #17202a;
+      --muted: #5f6b7a;
+      --primary: #0d6efd;
+      --primary-dark: #084298;
+      --border: #d9e2ec;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Noto Sans KR", "Segoe UI", sans-serif;
+      background: linear-gradient(130deg, #eef4ff, #f8fbff 40%, #eef9f2);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    .wrapper {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 40px 20px 60px;
+    }
+
+    .hero {
+      margin-bottom: 24px;
+    }
+
+    .hero h1 {
+      margin: 0 0 8px;
+      font-size: 2rem;
+    }
+
+    .hero p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: 0 6px 18px rgba(11, 35, 63, 0.06);
+    }
+
+    form {
+      display: grid;
+      gap: 12px;
+    }
+
+    label {
+      font-weight: 600;
+    }
+
+    input[type="url"] {
+      width: 100%;
+      border: 1px solid #b8c6d8;
+      border-radius: 10px;
+      padding: 12px 14px;
+      font-size: 1rem;
+      outline: none;
+      transition: border-color 0.2s ease;
+    }
+
+    input[type="url"]:focus {
+      border-color: var(--primary);
+    }
+
+    button {
+      border: 0;
+      border-radius: 10px;
+      padding: 12px 16px;
+      font-size: 1rem;
+      font-weight: 700;
+      background: var(--primary);
+      color: #fff;
+      cursor: pointer;
+      transition: background 0.2s ease;
+      width: fit-content;
+    }
+
+    button:hover {
+      background: var(--primary-dark);
+    }
+
+    button:disabled {
+      opacity: 0.65;
+      cursor: wait;
+    }
+
+    .status {
+      margin-top: 16px;
+      min-height: 1.5rem;
+      color: var(--muted);
+    }
+
+    .result {
+      margin-top: 20px;
+      display: none;
+      gap: 16px;
+    }
+
+    .result.show {
+      display: grid;
+    }
+
+    .panel {
+      background: #fbfdff;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px;
+    }
+
+    .panel h3 {
+      margin: 0 0 8px;
+      font-size: 1rem;
+    }
+
+    .content {
+      white-space: pre-wrap;
+      line-height: 1.6;
+      font-size: 0.95rem;
+      color: #1f2937;
+      max-height: 380px;
+      overflow-y: auto;
+    }
+
+    .meta {
+      font-size: 0.9rem;
+      color: var(--muted);
+      margin-bottom: 12px;
+    }
+
+    .links {
+      display: flex;
+      gap: 12px;
+      margin-top: 10px;
+      flex-wrap: wrap;
+    }
+
+    .links a {
+      color: var(--primary-dark);
+      text-decoration: none;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <main class="wrapper">
+    <section class="hero">
+      <h1>GitHub Repo Voice Analyzer</h1>
+      <p>공개 GitHub 저장소 URL을 입력하면 로컬 폴더로 클론하고, OpenAI로 소스를 기술 분석한 뒤 음성 MP3 파일을 생성합니다.</p>
+    </section>
+
+    <section class="card">
+      <form id="analyze-form">
+        <label for="repo_url">Public GitHub Repository URL</label>
+        <input
+          id="repo_url"
+          name="repo_url"
+          type="url"
+          required
+          placeholder="https://github.com/owner/repo"
+          value="https://github.com/openai/openai-python"
+        >
+        <button id="submit-btn" type="submit">분석 + 음성 생성</button>
+      </form>
+
+      <div class="status" id="status"></div>
+
+      <div class="result" id="result">
+        <div class="panel">
+          <h3>분석 메타 정보</h3>
+          <div class="meta" id="meta"></div>
+          <audio id="audio-player" controls preload="none" style="width: 100%;"></audio>
+          <div class="links">
+            <a id="audio-link" href="#" target="_blank" rel="noopener">MP3 다운로드</a>
+            <a id="analysis-link" href="#" target="_blank" rel="noopener">분석 텍스트 다운로드</a>
+          </div>
+        </div>
+        <div class="panel">
+          <h3>기술 분석</h3>
+          <div class="content" id="analysis-text"></div>
+        </div>
+        <div class="panel">
+          <h3>음성 스크립트</h3>
+          <div class="content" id="narration-text"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const form = document.getElementById("analyze-form");
+    const button = document.getElementById("submit-btn");
+    const statusEl = document.getElementById("status");
+    const resultEl = document.getElementById("result");
+    const metaEl = document.getElementById("meta");
+    const analysisEl = document.getElementById("analysis-text");
+    const narrationEl = document.getElementById("narration-text");
+    const audioPlayer = document.getElementById("audio-player");
+    const audioLink = document.getElementById("audio-link");
+    const analysisLink = document.getElementById("analysis-link");
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const repoUrl = document.getElementById("repo_url").value.trim();
+      if (!repoUrl) {
+        statusEl.textContent = "GitHub 저장소 URL을 입력해 주세요.";
+        return;
+      }
+
+      button.disabled = true;
+      resultEl.classList.remove("show");
+      statusEl.textContent = "저장소를 클론하고 분석 중입니다. 잠시만 기다려 주세요...";
+
+      try {
+        const response = await fetch("/api/analyze", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ repo_url: repoUrl }),
+        });
+        const payload = await response.json();
+
+        if (!response.ok) {
+          throw new Error(payload.detail || "요청 처리 중 오류가 발생했습니다.");
+        }
+
+        metaEl.textContent = `${payload.repository} | job_id=${payload.job_id} | local=${payload.local_path}`;
+        analysisEl.textContent = payload.analysis_text;
+        narrationEl.textContent = payload.narration_text;
+        audioPlayer.src = payload.audio_url;
+        audioLink.href = payload.audio_url;
+        analysisLink.href = payload.analysis_url;
+        statusEl.textContent = "완료되었습니다.";
+        resultEl.classList.add("show");
+      } catch (error) {
+        statusEl.textContent = `오류: ${error.message}`;
+      } finally {
+        button.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

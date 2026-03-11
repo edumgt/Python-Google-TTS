@@ -9,3 +9,11 @@
 /output*
 
 edumgt-key
+.env
+.venv
+__pycache__/
+*.pyc
+db.sqlite3
+media/
+workspace_repos/
+staticfiles/
