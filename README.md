@@ -34,14 +34,14 @@ FastAPI 앱에서 Django ASGI 앱을 `/`에 마운트해 단일 서버로 실행
 ```mermaid
 flowchart TD
     A[사용자: GitHub URL 입력] --> B[Django UI]
-    B --> C[POST /api/analyze]
+    B --> C[POST api analyze]
     C --> D[URL 검증]
     D --> E[GitHub Public Repo Clone]
     E --> F[소스 샘플링/컨텍스트 생성]
     F --> G[OpenAI 코드 분석 요청]
     G --> H[분석 텍스트 + 내레이션 스크립트 생성]
     H --> I[OpenAI TTS MP3 생성]
-    I --> J[/media/outputs 저장]
+    I --> J[media outputs 저장]
     J --> K[결과 JSON 반환]
     K --> L[웹 UI에서 분석 표시/음성 재생/다운로드]
 ```
@@ -51,22 +51,22 @@ flowchart TD
 sequenceDiagram
     actor U as User
     participant D as Django UI
-    participant F as FastAPI /api/analyze
+    participant F as FastAPI API
     participant G as GitHub
     participant O as OpenAI API
     participant S as Local Storage
 
     U->>D: GitHub Public URL 입력 + 분석 요청
-    D->>F: POST /api/analyze {repo_url}
+    D->>F: POST api analyze repo_url
     F->>F: URL 유효성 검사
     F->>G: git clone --depth 1
     G-->>F: 저장소 로컬 복제 완료
     F->>F: 코드 샘플링/프롬프트 컨텍스트 구성
-    F->>O: 코드 분석 요청 (chat.completions)
+    F->>O: 코드 분석 요청 chat.completions
     O-->>F: 분석 텍스트 + 내레이션 스크립트
-    F->>O: 음성 생성 요청 (audio.speech)
+    F->>O: 음성 생성 요청 audio.speech
     O-->>F: MP3 바이너리
-    F->>S: 분석(.md), 음성(.mp3) 저장
+    F->>S: 분석 md, 음성 mp3 저장
     F-->>D: 결과 JSON (text/audio URL)
     D-->>U: 분석 표시 + 오디오 재생/다운로드
 ```
@@ -102,6 +102,20 @@ cp .env.example .env
 ## 실행
 ```bash
 uvicorn repo_voice_analyzer.fastapi_app:app --reload --host 0.0.0.0 --port 8000
+```
+
+## Docker 실행
+`.env`를 준비한 뒤 Docker Compose로 실행할 수 있습니다.
+
+```bash
+cp .env.example .env
+# .env 파일에서 OPENAI_API_KEY 설정
+docker compose up -d --build
+```
+
+중지:
+```bash
+docker compose down
 ```
 
 브라우저:

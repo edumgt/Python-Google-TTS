@@ -1,0 +1,12 @@
+.git
+.github
+.venv
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+db.sqlite3
+media/
+workspace_repos/
+staticfiles/
