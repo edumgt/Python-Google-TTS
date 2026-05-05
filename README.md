@@ -1,6 +1,6 @@
 # Django + FastAPI GitHub Repo Voice Analyzer
 
-### test
+## Github Repo 구성 사례로 이 repo 의 템플릿과 같이 구성하는 연습을 합니다.
 
 입력한 GitHub public 저장소 URL을 기준으로:
 1. 저장소를 로컬 폴더에 클론
