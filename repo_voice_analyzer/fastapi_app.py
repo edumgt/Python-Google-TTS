@@ -15,24 +15,24 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "repo_voice_analyzer.settings")
 django_asgi_app = get_asgi_application()
 
 app = FastAPI(
-    title="Repo Voice Analyzer API",
-    description="GitHub public repository analysis + OpenAI narration + TTS",
-    version="1.0.0",
+    title="Financial Site Voice Analyzer API",
+    description="국내외 금융/투자 사이트 콘텐츠 분석 + OpenAI 인사이트 + TTS 음성 생성",
+    version="2.0.0",
 )
 
 
 class AnalyzeRequest(BaseModel):
-    repo_url: str = Field(
+    site_url: str = Field(
         ...,
-        description="Public GitHub repository URL",
-        examples=["https://github.com/openai/openai-python"],
+        description="분석할 금융/투자 사이트 URL",
+        examples=["https://finance.naver.com", "https://finance.yahoo.com"],
     )
 
 
 class AnalyzeResponse(BaseModel):
     job_id: str
-    repository: str
-    local_path: str
+    site_url: str
+    site_name: str
     analysis_text: str
     narration_text: str
     audio_url: str
@@ -45,9 +45,9 @@ def health_check() -> dict[str, str]:
 
 
 @app.post("/api/analyze", response_model=AnalyzeResponse)
-async def analyze_repository(payload: AnalyzeRequest) -> AnalyzeResponse:
+async def analyze_financial_site(payload: AnalyzeRequest) -> AnalyzeResponse:
     try:
-        result = await run_in_threadpool(run_pipeline, payload.repo_url)
+        result = await run_in_threadpool(run_pipeline, payload.site_url)
         return AnalyzeResponse(**result.to_dict())
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

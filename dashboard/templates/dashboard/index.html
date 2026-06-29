@@ -3,57 +3,85 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>GitHub Repo Voice Analyzer</title>
+  <title>금융 사이트 Voice Analyzer</title>
   <style>
     :root {
-      --bg: #f2f5f9;
+      --bg: #f0f4f8;
       --card: #ffffff;
       --text: #17202a;
       --muted: #5f6b7a;
-      --primary: #0d6efd;
-      --primary-dark: #084298;
-      --border: #d9e2ec;
+      --primary: #1a56db;
+      --primary-dark: #1043a6;
+      --accent: #0e9f6e;
+      --border: #d4dce8;
+      --tag-bg: #eef2ff;
+      --tag-text: #3730a3;
     }
 
-    * {
-      box-sizing: border-box;
-    }
+    * { box-sizing: border-box; }
 
     body {
       margin: 0;
       font-family: "Noto Sans KR", "Segoe UI", sans-serif;
-      background: linear-gradient(130deg, #eef4ff, #f8fbff 40%, #eef9f2);
+      background: linear-gradient(135deg, #e8f0fe, #f0faf5 50%, #e8f0fe);
       color: var(--text);
       min-height: 100vh;
     }
 
     .wrapper {
-      max-width: 980px;
+      max-width: 1000px;
       margin: 0 auto;
       padding: 40px 20px 60px;
     }
 
     .hero {
-      margin-bottom: 24px;
+      margin-bottom: 28px;
     }
 
     .hero h1 {
-      margin: 0 0 8px;
-      font-size: 2rem;
+      margin: 0 0 6px;
+      font-size: 1.9rem;
+      color: #111827;
+    }
+
+    .hero h1 span {
+      color: var(--primary);
     }
 
     .hero p {
-      margin: 0;
+      margin: 0 0 14px;
       color: var(--muted);
-      line-height: 1.6;
+      line-height: 1.65;
+    }
+
+    .site-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .site-tag {
+      background: var(--tag-bg);
+      color: var(--tag-text);
+      border: 1px solid #c7d2fe;
+      border-radius: 20px;
+      padding: 4px 12px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .site-tag:hover {
+      background: #c7d2fe;
     }
 
     .card {
       background: var(--card);
       border: 1px solid var(--border);
       border-radius: 16px;
-      padding: 20px;
-      box-shadow: 0 6px 18px rgba(11, 35, 63, 0.06);
+      padding: 24px;
+      box-shadow: 0 6px 20px rgba(11, 35, 90, 0.07);
     }
 
     form {
@@ -63,52 +91,63 @@
 
     label {
       font-weight: 600;
+      font-size: 0.95rem;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 10px;
     }
 
     input[type="url"] {
-      width: 100%;
-      border: 1px solid #b8c6d8;
+      flex: 1;
+      border: 1.5px solid #b8c6d8;
       border-radius: 10px;
       padding: 12px 14px;
       font-size: 1rem;
       outline: none;
-      transition: border-color 0.2s ease;
+      transition: border-color 0.2s;
     }
 
     input[type="url"]:focus {
       border-color: var(--primary);
     }
 
-    button {
+    button[type="submit"] {
       border: 0;
       border-radius: 10px;
-      padding: 12px 16px;
+      padding: 12px 22px;
       font-size: 1rem;
       font-weight: 700;
       background: var(--primary);
       color: #fff;
       cursor: pointer;
-      transition: background 0.2s ease;
-      width: fit-content;
+      transition: background 0.2s;
+      white-space: nowrap;
     }
 
-    button:hover {
+    button[type="submit"]:hover {
       background: var(--primary-dark);
     }
 
-    button:disabled {
-      opacity: 0.65;
+    button[type="submit"]:disabled {
+      opacity: 0.6;
       cursor: wait;
     }
 
     .status {
-      margin-top: 16px;
-      min-height: 1.5rem;
+      margin-top: 14px;
+      min-height: 1.4rem;
       color: var(--muted);
+      font-size: 0.93rem;
+    }
+
+    .status.error {
+      color: #dc2626;
     }
 
     .result {
-      margin-top: 20px;
+      margin-top: 24px;
       display: none;
       gap: 16px;
     }
@@ -118,87 +157,144 @@
     }
 
     .panel {
-      background: #fbfdff;
+      background: #f8fafd;
       border: 1px solid var(--border);
       border-radius: 12px;
-      padding: 14px;
+      padding: 16px 18px;
     }
 
     .panel h3 {
-      margin: 0 0 8px;
-      font-size: 1rem;
+      margin: 0 0 10px;
+      font-size: 0.97rem;
+      color: #374151;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .badge {
+      display: inline-block;
+      background: #d1fae5;
+      color: #065f46;
+      border-radius: 6px;
+      padding: 2px 8px;
+      font-size: 0.75rem;
+      font-weight: 700;
     }
 
     .content {
       white-space: pre-wrap;
-      line-height: 1.6;
-      font-size: 0.95rem;
+      line-height: 1.7;
+      font-size: 0.93rem;
       color: #1f2937;
-      max-height: 380px;
+      max-height: 420px;
       overflow-y: auto;
     }
 
     .meta {
-      font-size: 0.9rem;
+      font-size: 0.88rem;
       color: var(--muted);
       margin-bottom: 12px;
+      word-break: break-all;
     }
 
     .links {
       display: flex;
-      gap: 12px;
-      margin-top: 10px;
+      gap: 14px;
+      margin-top: 12px;
       flex-wrap: wrap;
     }
 
     .links a {
-      color: var(--primary-dark);
+      color: var(--primary);
       text-decoration: none;
       font-weight: 600;
+      font-size: 0.9rem;
+    }
+
+    .links a:hover {
+      text-decoration: underline;
+    }
+
+    audio {
+      width: 100%;
+      margin-top: 4px;
+    }
+
+    .disclaimer {
+      margin-top: 28px;
+      padding: 12px 16px;
+      background: #fffbeb;
+      border: 1px solid #fde68a;
+      border-radius: 10px;
+      font-size: 0.83rem;
+      color: #92400e;
+      line-height: 1.5;
     }
   </style>
 </head>
 <body>
   <main class="wrapper">
     <section class="hero">
-      <h1>GitHub Repo Voice Analyzer</h1>
-      <p>공개 GitHub 저장소 URL을 입력하면 로컬 폴더로 클론하고, OpenAI로 소스를 기술 분석한 뒤 음성 MP3 파일을 생성합니다.</p>
+      <h1>금융 사이트 <span>Voice Analyzer</span></h1>
+      <p>국내외 금융·투자 사이트 URL을 입력하면 콘텐츠를 수집하고, OpenAI로 시장 분석·투자 인사이트를 생성한 뒤 음성 MP3 파일로 만들어 드립니다.</p>
+      <div class="site-tags" id="quick-links">
+        <span class="site-tag" data-url="https://finance.naver.com">네이버 금융</span>
+        <span class="site-tag" data-url="https://finance.daum.net">카카오 금융</span>
+        <span class="site-tag" data-url="https://www.krx.co.kr">한국거래소 KRX</span>
+        <span class="site-tag" data-url="https://www.hankyung.com">한국경제</span>
+        <span class="site-tag" data-url="https://www.mk.co.kr">매일경제</span>
+        <span class="site-tag" data-url="https://finance.yahoo.com">Yahoo Finance</span>
+        <span class="site-tag" data-url="https://www.bloomberg.com">Bloomberg</span>
+        <span class="site-tag" data-url="https://www.investing.com">Investing.com</span>
+        <span class="site-tag" data-url="https://www.marketwatch.com">MarketWatch</span>
+        <span class="site-tag" data-url="https://www.reuters.com">Reuters Markets</span>
+        <span class="site-tag" data-url="https://www.cnbc.com">CNBC</span>
+        <span class="site-tag" data-url="https://www.tradingview.com">TradingView</span>
+      </div>
     </section>
 
     <section class="card">
       <form id="analyze-form">
-        <label for="repo_url">Public GitHub Repository URL</label>
-        <input
-          id="repo_url"
-          name="repo_url"
-          type="url"
-          required
-          placeholder="https://github.com/owner/repo"
-          value="https://github.com/openai/openai-python"
-        >
-        <button id="submit-btn" type="submit">분석 + 음성 생성</button>
+        <label for="site_url">금융/투자 사이트 URL</label>
+        <div class="input-row">
+          <input
+            id="site_url"
+            name="site_url"
+            type="url"
+            required
+            placeholder="https://finance.naver.com"
+            value="https://finance.naver.com"
+          >
+          <button id="submit-btn" type="submit">분석 + 음성 생성</button>
+        </div>
       </form>
 
       <div class="status" id="status"></div>
 
       <div class="result" id="result">
         <div class="panel">
-          <h3>분석 메타 정보</h3>
+          <h3>분석 정보 <span class="badge" id="site-badge"></span></h3>
           <div class="meta" id="meta"></div>
-          <audio id="audio-player" controls preload="none" style="width: 100%;"></audio>
+          <audio id="audio-player" controls preload="none"></audio>
           <div class="links">
             <a id="audio-link" href="#" target="_blank" rel="noopener">MP3 다운로드</a>
             <a id="analysis-link" href="#" target="_blank" rel="noopener">분석 텍스트 다운로드</a>
           </div>
         </div>
         <div class="panel">
-          <h3>기술 분석</h3>
+          <h3>시장 분석 &amp; 투자 인사이트</h3>
           <div class="content" id="analysis-text"></div>
         </div>
         <div class="panel">
           <h3>음성 스크립트</h3>
           <div class="content" id="narration-text"></div>
         </div>
+      </div>
+
+      <div class="disclaimer">
+        ※ 본 서비스는 금융 정보 제공 목적이며, 특정 종목의 매수·매도를 권유하지 않습니다.
+        투자 결과에 대한 책임은 투자자 본인에게 있습니다.
       </div>
     </section>
   </main>
@@ -209,29 +305,41 @@
     const statusEl = document.getElementById("status");
     const resultEl = document.getElementById("result");
     const metaEl = document.getElementById("meta");
+    const siteBadge = document.getElementById("site-badge");
     const analysisEl = document.getElementById("analysis-text");
     const narrationEl = document.getElementById("narration-text");
     const audioPlayer = document.getElementById("audio-player");
     const audioLink = document.getElementById("audio-link");
     const analysisLink = document.getElementById("analysis-link");
+    const urlInput = document.getElementById("site_url");
+
+    // 빠른 사이트 태그 클릭
+    document.getElementById("quick-links").addEventListener("click", (e) => {
+      const tag = e.target.closest(".site-tag");
+      if (tag && tag.dataset.url) {
+        urlInput.value = tag.dataset.url;
+      }
+    });
 
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
-      const repoUrl = document.getElementById("repo_url").value.trim();
-      if (!repoUrl) {
-        statusEl.textContent = "GitHub 저장소 URL을 입력해 주세요.";
+      const siteUrl = urlInput.value.trim();
+      if (!siteUrl) {
+        statusEl.textContent = "금융 사이트 URL을 입력해 주세요.";
+        statusEl.className = "status error";
         return;
       }
 
       button.disabled = true;
       resultEl.classList.remove("show");
-      statusEl.textContent = "저장소를 클론하고 분석 중입니다. 잠시만 기다려 주세요...";
+      statusEl.className = "status";
+      statusEl.textContent = "사이트 콘텐츠를 수집하고 분석 중입니다. 잠시만 기다려 주세요...";
 
       try {
         const response = await fetch("/api/analyze", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ repo_url: repoUrl }),
+          body: JSON.stringify({ site_url: siteUrl }),
         });
         const payload = await response.json();
 
@@ -239,16 +347,19 @@
           throw new Error(payload.detail || "요청 처리 중 오류가 발생했습니다.");
         }
 
-        metaEl.textContent = `${payload.repository} | job_id=${payload.job_id} | local=${payload.local_path}`;
+        siteBadge.textContent = new URL(payload.site_url).hostname;
+        metaEl.textContent = `${payload.site_name}  |  job_id: ${payload.job_id}`;
         analysisEl.textContent = payload.analysis_text;
         narrationEl.textContent = payload.narration_text;
         audioPlayer.src = payload.audio_url;
         audioLink.href = payload.audio_url;
         analysisLink.href = payload.analysis_url;
-        statusEl.textContent = "완료되었습니다.";
+        statusEl.textContent = "분석이 완료되었습니다.";
+        statusEl.className = "status";
         resultEl.classList.add("show");
       } catch (error) {
         statusEl.textContent = `오류: ${error.message}`;
+        statusEl.className = "status error";
       } finally {
         button.disabled = false;
       }

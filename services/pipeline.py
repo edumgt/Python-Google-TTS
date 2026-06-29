@@ -1,87 +1,92 @@
 from __future__ import annotations
 
-from collections import Counter
-from dataclasses import dataclass
-from pathlib import Path
 import os
 import re
-import subprocess
 import uuid
+from dataclasses import dataclass
+from pathlib import Path
 from urllib.parse import urlparse
 
+import requests
+from bs4 import BeautifulSoup
 from django.conf import settings
 from openai import OpenAI
 
 
-SUPPORTED_EXTENSIONS = {
-    ".py",
-    ".js",
-    ".jsx",
-    ".ts",
-    ".tsx",
-    ".java",
-    ".kt",
-    ".go",
-    ".rs",
-    ".c",
-    ".cpp",
-    ".cs",
-    ".php",
-    ".rb",
-    ".swift",
-    ".scala",
-    ".sql",
-    ".html",
-    ".css",
-    ".scss",
-    ".json",
-    ".yaml",
-    ".yml",
-    ".toml",
-    ".md",
-    ".sh",
+MAX_CONTENT_CHARS = 12_000
+
+_SCRAPE_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/125.0.0.0 Safari/537.36"
+    ),
+    "Accept-Language": "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
 }
 
-SPECIAL_FILENAMES = {
-    "dockerfile",
-    "makefile",
-    "requirements.txt",
-    "package.json",
-    "pyproject.toml",
-    "cargo.toml",
-    "go.mod",
-    "pom.xml",
-    "build.gradle",
-    "settings.gradle",
-    "readme.md",
+_REMOVE_TAGS = {
+    "script", "style", "noscript", "iframe", "nav", "footer",
+    "header", "aside", "form", "button", "svg", "img", "video",
+    "audio", "ads", "advertisement",
 }
 
-IGNORED_DIRECTORIES = {
-    ".git",
-    "node_modules",
-    "dist",
-    "build",
-    "target",
-    "bin",
-    "obj",
-    ".venv",
-    "venv",
-    "__pycache__",
-    ".mypy_cache",
-    ".pytest_cache",
+ALLOWED_FINANCIAL_DOMAINS = {
+    # 국내
+    "finance.naver.com",
+    "m.stock.naver.com",
+    "finance.daum.net",
+    "www.krx.co.kr",
+    "krx.co.kr",
+    "www.hankyung.com",
+    "hankyung.com",
+    "www.mk.co.kr",
+    "mk.co.kr",
+    "www.sedaily.com",
+    "sedaily.com",
+    "www.etnews.com",
+    "fnguide.com",
+    "www.fnguide.com",
+    "stockplus.com",
+    "www.stockplus.com",
+    "investing.co.kr",
+    "www.investing.co.kr",
+    "infostock.co.kr",
+    "www.infostock.co.kr",
+    "thebell.co.kr",
+    "www.thebell.co.kr",
+    # 국외
+    "finance.yahoo.com",
+    "www.bloomberg.com",
+    "bloomberg.com",
+    "www.reuters.com",
+    "reuters.com",
+    "www.investing.com",
+    "investing.com",
+    "www.marketwatch.com",
+    "marketwatch.com",
+    "www.seekingalpha.com",
+    "seekingalpha.com",
+    "www.tradingview.com",
+    "tradingview.com",
+    "www.wsj.com",
+    "wsj.com",
+    "www.ft.com",
+    "ft.com",
+    "www.cnbc.com",
+    "cnbc.com",
+    "www.fool.com",
+    "fool.com",
+    "finviz.com",
+    "www.finviz.com",
 }
-
-MAX_FILES = 80
-MAX_FILE_BYTES = 300_000
-MAX_FILE_CHARS = 3500
-MAX_TOTAL_CHARS = 70_000
 
 
 @dataclass
 class PipelineResult:
     job_id: str
-    repository: str
-    local_path: str
+    site_url: str
+    site_name: str
     analysis_text: str
     narration_text: str
     audio_url: str
@@ -90,8 +95,8 @@ class PipelineResult:
     def to_dict(self) -> dict[str, str]:
         return {
             "job_id": self.job_id,
-            "repository": self.repository,
-            "local_path": self.local_path,
+            "site_url": self.site_url,
+            "site_name": self.site_name,
             "analysis_text": self.analysis_text,
             "narration_text": self.narration_text,
             "audio_url": self.audio_url,
@@ -99,25 +104,20 @@ class PipelineResult:
         }
 
 
-def run_pipeline(repo_url: str) -> PipelineResult:
-    owner, repo_name = parse_github_repo_url(repo_url)
-    repository_slug = f"{owner}/{repo_name}"
+def run_pipeline(site_url: str) -> PipelineResult:
+    validated_url = validate_financial_url(site_url)
     job_id = uuid.uuid4().hex
-
-    workspace_root = Path(settings.BASE_DIR) / "workspace_repos"
-    workspace_root.mkdir(parents=True, exist_ok=True)
 
     media_output_root = Path(settings.MEDIA_ROOT) / "outputs"
     media_output_root.mkdir(parents=True, exist_ok=True)
 
-    local_repo_path = workspace_root / f"{owner}__{repo_name}__{job_id[:8]}"
-    clone_public_repository(owner, repo_name, local_repo_path)
+    page_content = fetch_website_content(validated_url)
+    site_name = page_content["title"] or urlparse(validated_url).netloc
 
-    context = build_repository_context(local_repo_path)
     analysis_text, narration_text = request_analysis_and_narration(
-        repo_url=repo_url.strip(),
-        repository_slug=repository_slug,
-        context=context,
+        site_url=validated_url,
+        site_name=site_name,
+        page_content=page_content,
     )
 
     audio_file_path = media_output_root / f"{job_id}.mp3"
@@ -125,17 +125,18 @@ def run_pipeline(repo_url: str) -> PipelineResult:
 
     analysis_file_path = media_output_root / f"{job_id}.md"
     analysis_file_path.write_text(
-        f"# Repository: {repository_slug}\n\n"
+        f"# 금융 사이트 분석: {site_name}\n\n"
+        f"URL: {validated_url}\n\n"
         f"{analysis_text}\n\n"
-        "## Narration Script\n\n"
+        "## 음성 스크립트\n\n"
         f"{narration_text}\n",
         encoding="utf-8",
     )
 
     return PipelineResult(
         job_id=job_id,
-        repository=repository_slug,
-        local_path=str(local_repo_path),
+        site_url=validated_url,
+        site_name=site_name,
         analysis_text=analysis_text,
         narration_text=narration_text,
         audio_url=f"{settings.MEDIA_URL}outputs/{audio_file_path.name}",
@@ -143,149 +144,137 @@ def run_pipeline(repo_url: str) -> PipelineResult:
     )
 
 
-def parse_github_repo_url(repo_url: str) -> tuple[str, str]:
-    cleaned = repo_url.strip()
+def validate_financial_url(url: str) -> str:
+    cleaned = url.strip()
     parsed = urlparse(cleaned)
 
     if parsed.scheme not in {"http", "https"}:
-        raise ValueError("유효한 http/https GitHub URL을 입력해 주세요.")
-    if parsed.netloc.lower() not in {"github.com", "www.github.com"}:
-        raise ValueError("GitHub public 저장소 URL만 허용됩니다.")
+        raise ValueError("유효한 http/https URL을 입력해 주세요.")
 
-    path_parts = [part for part in parsed.path.split("/") if part]
-    if len(path_parts) < 2:
-        raise ValueError("GitHub 저장소 형식은 https://github.com/{owner}/{repo} 입니다.")
+    netloc = parsed.netloc.lower().lstrip("www.")
+    full_netloc = parsed.netloc.lower()
+    if full_netloc not in ALLOWED_FINANCIAL_DOMAINS and netloc not in ALLOWED_FINANCIAL_DOMAINS:
+        allowed_list = ", ".join(sorted(ALLOWED_FINANCIAL_DOMAINS)[:10])
+        raise ValueError(
+            f"지원하지 않는 도메인입니다. 지원 사이트 예시: {allowed_list} 등"
+        )
 
-    owner = path_parts[0]
-    repo_name = path_parts[1]
-    if repo_name.endswith(".git"):
-        repo_name = repo_name[:-4]
-
-    if not owner or not repo_name:
-        raise ValueError("GitHub owner/repo 값을 확인해 주세요.")
-
-    return owner, repo_name
+    return cleaned
 
 
-def clone_public_repository(owner: str, repo_name: str, target_dir: Path) -> None:
-    clone_url = f"https://github.com/{owner}/{repo_name}.git"
-    command = ["git", "clone", "--depth", "1", clone_url, str(target_dir)]
+def fetch_website_content(url: str) -> dict[str, object]:
     try:
-        subprocess.run(
-            command,
-            check=True,
-            capture_output=True,
-            text=True,
-            timeout=240,
+        response = requests.get(
+            url,
+            headers=_SCRAPE_HEADERS,
+            timeout=20,
+            allow_redirects=True,
         )
-    except subprocess.TimeoutExpired as exc:
-        raise RuntimeError("저장소 클론 시간이 초과되었습니다.") from exc
-    except subprocess.CalledProcessError as exc:
-        stderr = (exc.stderr or "").strip()
-        raise ValueError(f"저장소 클론 실패: {stderr or '알 수 없는 오류'}") from exc
+        response.raise_for_status()
+    except requests.exceptions.Timeout as exc:
+        raise RuntimeError("사이트 응답 시간이 초과되었습니다. 잠시 후 다시 시도해 주세요.") from exc
+    except requests.exceptions.RequestException as exc:
+        raise ValueError(f"사이트 접근 실패: {exc}") from exc
 
+    # 인코딩 감지
+    if response.encoding and response.encoding.lower() in {"utf-8", "utf8"}:
+        html = response.text
+    else:
+        detected = response.apparent_encoding or "utf-8"
+        html = response.content.decode(detected, errors="ignore")
 
-def build_repository_context(repo_root: Path) -> dict[str, object]:
-    candidate_paths: list[Path] = []
+    soup = BeautifulSoup(html, "lxml")
 
-    for file_path in repo_root.rglob("*"):
-        if not file_path.is_file():
-            continue
-        rel_parts = file_path.relative_to(repo_root).parts
-        if any(part in IGNORED_DIRECTORIES for part in rel_parts):
-            continue
-        if not is_candidate_file(file_path):
-            continue
-        if file_path.stat().st_size > MAX_FILE_BYTES:
-            continue
-        candidate_paths.append(file_path)
+    # 불필요한 태그 제거
+    for tag in soup.find_all(_REMOVE_TAGS):
+        tag.decompose()
 
-    candidate_paths.sort(
-        key=lambda path: (
-            file_priority(path),
-            len(path.relative_to(repo_root).parts),
-            path.relative_to(repo_root).as_posix(),
-        )
+    # 페이지 제목
+    title = ""
+    if soup.title and soup.title.string:
+        title = soup.title.string.strip()
+
+    # 메타 설명
+    meta_desc = ""
+    meta_tag = soup.find("meta", attrs={"name": re.compile(r"description", re.I)})
+    if meta_tag and meta_tag.get("content"):
+        meta_desc = meta_tag["content"].strip()
+
+    # 본문 우선순위: <article> > <main> > <div class=content…> > <body>
+    body_el = (
+        soup.find("article")
+        or soup.find("main")
+        or soup.find("div", class_=re.compile(r"(content|article|news|stock|market)", re.I))
+        or soup.body
     )
 
-    snippets: list[str] = []
-    extension_counter: Counter[str] = Counter()
-    consumed_chars = 0
-    selected_count = 0
+    raw_text = (body_el or soup).get_text(separator="\n", strip=True)
+    # 빈 줄 정리
+    lines = [ln.strip() for ln in raw_text.splitlines() if ln.strip()]
+    body_text = "\n".join(lines)
 
-    for file_path in candidate_paths:
-        if selected_count >= MAX_FILES or consumed_chars >= MAX_TOTAL_CHARS:
-            break
-        content = safe_read_text(file_path)
-        if not content.strip():
-            continue
+    # 테이블 데이터 수집 (시세 등)
+    table_snippets: list[str] = []
+    for table in (body_el or soup).find_all("table")[:5]:
+        rows = []
+        for tr in table.find_all("tr")[:15]:
+            cells = [td.get_text(strip=True) for td in tr.find_all(["th", "td"])]
+            if any(cells):
+                rows.append(" | ".join(cells))
+        if rows:
+            table_snippets.append("\n".join(rows))
 
-        excerpt = content[:MAX_FILE_CHARS]
-        rel_path = file_path.relative_to(repo_root).as_posix()
-        extension_key = file_path.suffix.lower() or file_path.name.lower()
+    table_text = "\n\n".join(table_snippets)
 
-        extension_counter[extension_key] += 1
-        consumed_chars += len(excerpt)
-        selected_count += 1
-        snippets.append(
-            f"## {rel_path}\n"
-            f"```{language_hint(file_path)}\n"
-            f"{excerpt}\n"
-            "```"
-        )
+    # 전체 컨텍스트 조합 후 길이 제한
+    combined = f"[제목]\n{title}\n\n[요약]\n{meta_desc}\n\n[본문]\n{body_text}"
+    if table_text:
+        combined += f"\n\n[시세/데이터 테이블]\n{table_text}"
 
-    root_directories = sorted(
-        [
-            item.name
-            for item in repo_root.iterdir()
-            if item.is_dir() and item.name not in IGNORED_DIRECTORIES
-        ]
-    )
+    if len(combined) > MAX_CONTENT_CHARS:
+        combined = combined[:MAX_CONTENT_CHARS] + "\n\n...(내용 일부 생략)"
 
     return {
-        "selected_file_count": selected_count,
-        "consumed_chars": consumed_chars,
-        "extension_counter": dict(sorted(extension_counter.items(), key=lambda x: x[0])),
-        "root_directories": root_directories[:25],
-        "snippets": "\n\n".join(snippets),
+        "title": title,
+        "meta_desc": meta_desc,
+        "body_preview": body_text[:200],
+        "combined_text": combined,
+        "char_count": len(combined),
     }
 
 
 def request_analysis_and_narration(
-    repo_url: str,
-    repository_slug: str,
-    context: dict[str, object],
+    site_url: str,
+    site_name: str,
+    page_content: dict[str, object],
 ) -> tuple[str, str]:
     client = get_openai_client()
     analysis_model = os.getenv("OPENAI_ANALYSIS_MODEL", "gpt-4o-mini")
 
     system_message = (
-        "당신은 시니어 소프트웨어 아키텍트입니다. "
-        "입력된 저장소 코드 스냅샷을 바탕으로 기술 분석을 작성합니다. "
-        "반드시 한국어로 답하고, 응답은 아래 태그 형식을 지키세요.\n"
+        "당신은 국내외 금융시장과 주식 투자 전문가입니다. "
+        "입력된 금융/투자 사이트의 콘텐츠를 바탕으로 시장 분석과 투자 인사이트를 작성합니다. "
+        "반드시 한국어로 답하고, 응답은 아래 태그 형식을 지키세요.\n\n"
         "[ANALYSIS]\n"
-        "실행 가능한 기술 분석 본문\n"
+        "상세 시장 분석 본문 (마크다운 형식)\n"
         "[/ANALYSIS]\n"
         "[NARRATION]\n"
-        "TTS용 음성 스크립트 (자연스러운 설명체, 1~2분 분량)\n"
+        "TTS용 음성 스크립트 (자연스러운 설명체, 1~2분 분량, 마크다운 기호 없이 순수 텍스트)\n"
         "[/NARRATION]"
     )
 
     user_message = (
-        f"Repository: {repository_slug}\n"
-        f"URL: {repo_url}\n"
-        f"Selected files: {context['selected_file_count']}\n"
-        f"Prompt chars: {context['consumed_chars']}\n"
-        f"Top-level directories: {context['root_directories']}\n"
-        f"Extension distribution: {context['extension_counter']}\n\n"
+        f"분석 대상 사이트: {site_name}\n"
+        f"URL: {site_url}\n"
+        f"수집 콘텐츠 글자 수: {page_content['char_count']}\n\n"
         "요청사항:\n"
-        "1) 저장소의 핵심 목적과 문제 해결 범위를 분석\n"
-        "2) 아키텍처/기술스택/주요 모듈 역할 정리\n"
-        "3) 실행 흐름과 데이터 흐름 설명\n"
-        "4) 리스크/기술 부채/개선 포인트 제시\n"
-        "5) 마지막에는 짧은 운영 팁 제시\n\n"
-        "코드 스냅샷:\n"
-        f"{context['snippets']}"
+        "1) 현재 시장 상황 및 주요 이슈 요약 (국내/해외 구분)\n"
+        "2) 주요 종목·지수·자산 동향 분석 (등락률, 거래량, 특이사항)\n"
+        "3) 핵심 투자 시사점 및 주목할 섹터/테마\n"
+        "4) 단기·중기 투자 아이디어 및 주의 리스크\n"
+        "5) 개인 투자자를 위한 실전 조언 1~2가지\n\n"
+        "※ 특정 종목 매수·매도 추천은 지양하고, 시장 흐름과 참고 정보 중심으로 서술하세요.\n\n"
+        f"--- 수집된 콘텐츠 ---\n{page_content['combined_text']}"
     )
 
     response = client.chat.completions.create(
@@ -294,11 +283,10 @@ def request_analysis_and_narration(
             {"role": "system", "content": system_message},
             {"role": "user", "content": user_message},
         ],
-        temperature=0.2,
+        temperature=0.3,
     )
     raw_text = (response.choices[0].message.content or "").strip()
-    analysis_text, narration_text = split_response_sections(raw_text)
-    return analysis_text, narration_text
+    return split_response_sections(raw_text)
 
 
 def synthesize_speech(narration_text: str, output_path: Path) -> None:
@@ -375,76 +363,3 @@ def split_response_sections(raw_text: str) -> tuple[str, str]:
         narration_text = narration_text[:3500]
 
     return analysis_text, narration_text
-
-
-def is_candidate_file(file_path: Path) -> bool:
-    suffix = file_path.suffix.lower()
-    if suffix in SUPPORTED_EXTENSIONS:
-        return True
-    return file_path.name.lower() in SPECIAL_FILENAMES
-
-
-def file_priority(file_path: Path) -> int:
-    name = file_path.name.lower()
-    relative_name = file_path.as_posix().lower()
-
-    if name.startswith("readme"):
-        return 0
-    if name in {
-        "requirements.txt",
-        "pyproject.toml",
-        "package.json",
-        "dockerfile",
-        "compose.yml",
-        "docker-compose.yml",
-        "go.mod",
-        "cargo.toml",
-        "pom.xml",
-    }:
-        return 1
-    if "main" in name or "app" in name or "server" in name:
-        return 2
-    if "test" in relative_name:
-        return 4
-    return 3
-
-
-def safe_read_text(file_path: Path) -> str:
-    try:
-        raw = file_path.read_bytes()
-    except OSError:
-        return ""
-    if b"\x00" in raw:
-        return ""
-    return raw.decode("utf-8", errors="ignore")
-
-
-def language_hint(file_path: Path) -> str:
-    suffix = file_path.suffix.lower()
-    return {
-        ".py": "python",
-        ".js": "javascript",
-        ".jsx": "jsx",
-        ".ts": "typescript",
-        ".tsx": "tsx",
-        ".java": "java",
-        ".go": "go",
-        ".rs": "rust",
-        ".c": "c",
-        ".cpp": "cpp",
-        ".cs": "csharp",
-        ".php": "php",
-        ".rb": "ruby",
-        ".swift": "swift",
-        ".scala": "scala",
-        ".sql": "sql",
-        ".html": "html",
-        ".css": "css",
-        ".scss": "scss",
-        ".json": "json",
-        ".yaml": "yaml",
-        ".yml": "yaml",
-        ".toml": "toml",
-        ".md": "markdown",
-        ".sh": "bash",
-    }.get(suffix, "")
