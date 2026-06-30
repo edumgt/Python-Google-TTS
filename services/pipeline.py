@@ -13,7 +13,9 @@ from django.conf import settings
 from openai import OpenAI
 
 
-MAX_CONTENT_CHARS = 12_000
+MAX_CONTENT_CHARS = 6_000
+
+PROVIDERS = ("openai", "ollama", "solar")
 
 _SCRAPE_HEADERS = {
     "User-Agent": (
@@ -87,25 +89,30 @@ class PipelineResult:
     job_id: str
     site_url: str
     site_name: str
+    crawled_text: str
     analysis_text: str
     narration_text: str
     audio_url: str
     analysis_url: str
+    provider: str
 
     def to_dict(self) -> dict[str, str]:
         return {
             "job_id": self.job_id,
             "site_url": self.site_url,
             "site_name": self.site_name,
+            "crawled_text": self.crawled_text,
             "analysis_text": self.analysis_text,
             "narration_text": self.narration_text,
             "audio_url": self.audio_url,
             "analysis_url": self.analysis_url,
+            "provider": self.provider,
         }
 
 
-def run_pipeline(site_url: str) -> PipelineResult:
+def run_pipeline(site_url: str, provider: str | None = None) -> PipelineResult:
     validated_url = validate_financial_url(site_url)
+    resolved_provider = resolve_provider(provider)
     job_id = uuid.uuid4().hex
 
     media_output_root = Path(settings.MEDIA_ROOT) / "outputs"
@@ -118,10 +125,11 @@ def run_pipeline(site_url: str) -> PipelineResult:
         site_url=validated_url,
         site_name=site_name,
         page_content=page_content,
+        provider=resolved_provider,
     )
 
     audio_file_path = media_output_root / f"{job_id}.mp3"
-    synthesize_speech(narration_text=narration_text, output_path=audio_file_path)
+    synthesize_speech(narration_text=narration_text, output_path=audio_file_path, provider=resolved_provider)
 
     analysis_file_path = media_output_root / f"{job_id}.md"
     analysis_file_path.write_text(
@@ -137,11 +145,30 @@ def run_pipeline(site_url: str) -> PipelineResult:
         job_id=job_id,
         site_url=validated_url,
         site_name=site_name,
+        crawled_text=page_content["combined_text"],
         analysis_text=analysis_text,
         narration_text=narration_text,
         audio_url=f"{settings.MEDIA_URL}outputs/{audio_file_path.name}",
         analysis_url=f"{settings.MEDIA_URL}outputs/{analysis_file_path.name}",
+        provider=resolved_provider,
     )
+
+
+def resolve_provider(provider: str | None) -> str:
+    requested = (provider or "").strip().lower()
+    if not requested or requested == "auto":
+        requested = os.getenv("DEFAULT_AI_PROVIDER", "auto").strip().lower()
+
+    if requested and requested != "auto":
+        if requested not in PROVIDERS:
+            raise ValueError(f"지원하지 않는 AI 모델입니다: {requested}")
+        return requested
+
+    if os.getenv("OPENAI_API_KEY", "").strip():
+        return "openai"
+    if os.getenv("UPSTAGE_API_KEY", "").strip():
+        return "solar"
+    return "ollama"
 
 
 def validate_financial_url(url: str) -> str:
@@ -243,27 +270,23 @@ def fetch_website_content(url: str) -> dict[str, object]:
     }
 
 
-def request_analysis_and_narration(
-    site_url: str,
-    site_name: str,
-    page_content: dict[str, object],
-) -> tuple[str, str]:
-    client = get_openai_client()
-    analysis_model = os.getenv("OPENAI_ANALYSIS_MODEL", "gpt-4o-mini")
+_SYSTEM_MESSAGE = (
+    "당신은 국내외 금융시장과 주식 투자 전문가입니다. "
+    "입력된 금융/투자 사이트의 콘텐츠를 바탕으로 시장 분석과 투자 인사이트를 작성합니다. "
+    "반드시 한국어로 답하고, 응답은 아래 태그 형식을 정확히 지키세요. "
+    "두 태그 모두 반드시 포함하고, 여는 태그와 닫는 태그를 빠짐없이 작성하세요.\n\n"
+    "[ANALYSIS]\n"
+    "상세 시장 분석 본문 (마크다운 형식)\n"
+    "[/ANALYSIS]\n"
+    "[NARRATION]\n"
+    "TTS용 음성 스크립트 (자연스러운 설명체, 1~2분 분량, 마크다운 기호와 이모지 없이 순수 텍스트)\n"
+    "[/NARRATION]\n\n"
+    "위 두 섹션을 절대 생략하지 말고, 반드시 [/NARRATION] 닫는 태그로 응답을 마무리하세요."
+)
 
-    system_message = (
-        "당신은 국내외 금융시장과 주식 투자 전문가입니다. "
-        "입력된 금융/투자 사이트의 콘텐츠를 바탕으로 시장 분석과 투자 인사이트를 작성합니다. "
-        "반드시 한국어로 답하고, 응답은 아래 태그 형식을 지키세요.\n\n"
-        "[ANALYSIS]\n"
-        "상세 시장 분석 본문 (마크다운 형식)\n"
-        "[/ANALYSIS]\n"
-        "[NARRATION]\n"
-        "TTS용 음성 스크립트 (자연스러운 설명체, 1~2분 분량, 마크다운 기호 없이 순수 텍스트)\n"
-        "[/NARRATION]"
-    )
 
-    user_message = (
+def _build_user_message(site_url: str, site_name: str, page_content: dict[str, object]) -> str:
+    return (
         f"분석 대상 사이트: {site_name}\n"
         f"URL: {site_url}\n"
         f"수집 콘텐츠 글자 수: {page_content['char_count']}\n\n"
@@ -277,20 +300,105 @@ def request_analysis_and_narration(
         f"--- 수집된 콘텐츠 ---\n{page_content['combined_text']}"
     )
 
+
+def request_analysis_and_narration(
+    site_url: str,
+    site_name: str,
+    page_content: dict[str, object],
+    provider: str | None = None,
+) -> tuple[str, str]:
+    resolved_provider = resolve_provider(provider)
+    system_message = _SYSTEM_MESSAGE
+    user_message = _build_user_message(site_url, site_name, page_content)
+
+    try:
+        if resolved_provider == "openai":
+            raw_text = _call_openai(system_message, user_message)
+        elif resolved_provider == "solar":
+            raw_text = _call_solar(system_message, user_message)
+        else:
+            raw_text = _call_ollama(system_message, user_message)
+    except Exception as exc:
+        raise _wrap_llm_error(exc, resolved_provider) from exc
+
+    return split_response_sections(raw_text)
+
+
+def _call_openai(system_message: str, user_message: str) -> str:
+    api_key = os.getenv("OPENAI_API_KEY", "").strip()
+    if not api_key:
+        raise RuntimeError("OPENAI_API_KEY 환경변수가 설정되어 있지 않습니다.")
+    client = OpenAI(api_key=api_key, timeout=300)
+    model = os.getenv("OPENAI_ANALYSIS_MODEL", "gpt-4o-mini")
     response = client.chat.completions.create(
-        model=analysis_model,
+        model=model,
         messages=[
             {"role": "system", "content": system_message},
             {"role": "user", "content": user_message},
         ],
         temperature=0.3,
     )
-    raw_text = (response.choices[0].message.content or "").strip()
-    return split_response_sections(raw_text)
+    return (response.choices[0].message.content or "").strip()
 
 
-def synthesize_speech(narration_text: str, output_path: Path) -> None:
-    client = get_openai_client()
+def _call_solar(system_message: str, user_message: str) -> str:
+    api_key = os.getenv("UPSTAGE_API_KEY", "").strip()
+    if not api_key:
+        raise RuntimeError("UPSTAGE_API_KEY 환경변수가 설정되어 있지 않습니다.")
+    base_url = os.getenv("UPSTAGE_BASE_URL", "https://api.upstage.ai/v1/solar").strip()
+    model = os.getenv("UPSTAGE_MODEL", "solar-pro2")
+    client = OpenAI(api_key=api_key, base_url=base_url, timeout=300)
+    response = client.chat.completions.create(
+        model=model,
+        messages=[
+            {"role": "system", "content": system_message},
+            {"role": "user", "content": user_message},
+        ],
+        temperature=0.3,
+    )
+    return (response.choices[0].message.content or "").strip()
+
+
+def _call_ollama(system_message: str, user_message: str) -> str:
+    base_url = os.getenv("LM_STUDIO_BASE_URL", "http://localhost:1234/v1").strip().rstrip("/")
+    native_base = base_url[:-3] if base_url.endswith("/v1") else base_url
+    model = os.getenv("LM_STUDIO_MODEL", "local-model")
+
+    resp = requests.post(
+        f"{native_base}/api/chat",
+        json={
+            "model": model,
+            "messages": [
+                {"role": "system", "content": system_message},
+                {"role": "user", "content": user_message},
+            ],
+            "stream": False,
+            "think": False,
+            "keep_alive": "30m",
+            "options": {"temperature": 0.3},
+        },
+        timeout=300,
+    )
+    resp.raise_for_status()
+    data = resp.json()
+    return (data.get("message", {}).get("content") or "").strip()
+
+
+def _synthesize_speech_gtts(narration_text: str, output_path: Path) -> None:
+    from gtts import gTTS
+    tts = gTTS(text=narration_text, lang="ko", slow=False)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    tts.save(str(output_path))
+
+
+def synthesize_speech(narration_text: str, output_path: Path, provider: str | None = None) -> None:
+    resolved_provider = resolve_provider(provider)
+    if resolved_provider != "openai":
+        _synthesize_speech_gtts(narration_text, output_path)
+        return
+
+    api_key = os.getenv("OPENAI_API_KEY", "").strip()
+    client = OpenAI(api_key=api_key, timeout=300)
     tts_model = os.getenv("OPENAI_TTS_MODEL", "gpt-4o-mini-tts")
     tts_voice = os.getenv("OPENAI_TTS_VOICE", "alloy")
 
@@ -329,11 +437,29 @@ def synthesize_speech(narration_text: str, output_path: Path) -> None:
     raise RuntimeError("OpenAI 음성 응답을 파일로 저장하지 못했습니다.")
 
 
-def get_openai_client() -> OpenAI:
-    api_key = os.getenv("OPENAI_API_KEY", "").strip()
-    if not api_key:
-        raise RuntimeError("OPENAI_API_KEY 환경변수가 설정되어 있지 않습니다.")
-    return OpenAI(api_key=api_key)
+def _wrap_llm_error(exc: Exception, provider: str) -> Exception:
+    msg = str(exc)
+    if "Connection error" in msg or "connection" in msg.lower() or "ConnectionError" in type(exc).__name__:
+        if provider == "ollama":
+            lm_url = os.getenv("LM_STUDIO_BASE_URL", "http://localhost:1234/v1")
+            return RuntimeError(
+                f"Ollama/LM Studio 서버에 연결할 수 없습니다 ({lm_url}). "
+                "서버가 실행 중인지, LM_STUDIO_BASE_URL 설정이 올바른지 확인해 주세요."
+            )
+        if provider == "solar":
+            return RuntimeError("Upstage Solar API에 연결할 수 없습니다. UPSTAGE_API_KEY와 네트워크 상태를 확인해 주세요.")
+        return RuntimeError("OpenAI API에 연결할 수 없습니다. 네트워크 상태를 확인해 주세요.")
+    return exc
+
+
+def _strip_markdown_for_speech(text: str) -> str:
+    text = re.sub(r"^\[/?(ANALYSIS|NARRATION)\]\s*", "", text, flags=re.IGNORECASE | re.MULTILINE)
+    text = re.sub(r"#+\s*", "", text)
+    text = re.sub(r"\*\*?", "", text)
+    text = re.sub(r"`", "", text)
+    text = re.sub(r"^[-*]\s+", "", text, flags=re.MULTILINE)
+    text = re.sub(r"\n{2,}", "\n", text)
+    return text.strip()
 
 
 def split_response_sections(raw_text: str) -> tuple[str, str]:
@@ -348,15 +474,18 @@ def split_response_sections(raw_text: str) -> tuple[str, str]:
         flags=re.IGNORECASE | re.DOTALL,
     )
 
-    analysis_text = (
-        analysis_match.group(1).strip()
-        if analysis_match
-        else raw_text.strip() or "분석 결과를 생성하지 못했습니다."
-    )
+    if analysis_match:
+        analysis_text = analysis_match.group(1).strip()
+    else:
+        # 닫는 태그가 누락된 경우, NARRATION 섹션 시작 전까지를 분석 본문으로 사용
+        analysis_text = re.split(r"\[/?NARRATION\]", raw_text, flags=re.IGNORECASE)[0]
+        analysis_text = re.sub(r"^\s*\[ANALYSIS\]\s*", "", analysis_text.strip(), flags=re.IGNORECASE)
+        analysis_text = analysis_text.strip() or "분석 결과를 생성하지 못했습니다."
+
     narration_text = (
         narration_match.group(1).strip()
         if narration_match
-        else analysis_text[:1500]
+        else _strip_markdown_for_speech(analysis_text)[:1500]
     )
 
     if len(narration_text) > 3500:

@@ -16,7 +16,22 @@ services:
       DJANGO_DEBUG: ${DJANGO_DEBUG:-true}
       DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-*}
       APP_TIME_ZONE: ${APP_TIME_ZONE:-Asia/Seoul}
+      LM_STUDIO_BASE_URL: ${LM_STUDIO_BASE_URL:-http://ollama:11434/v1}
+      LM_STUDIO_MODEL: ${LM_STUDIO_MODEL:-qwen3.5:latest}
+      UPSTAGE_API_KEY: ${UPSTAGE_API_KEY:-}
+      UPSTAGE_BASE_URL: ${UPSTAGE_BASE_URL:-https://api.upstage.ai/v1/solar}
+      UPSTAGE_MODEL: ${UPSTAGE_MODEL:-solar-pro2}
+      DEFAULT_AI_PROVIDER: ${DEFAULT_AI_PROVIDER:-auto}
     volumes:
       - ./media:/app/media
       - ./workspace_repos:/app/workspace_repos
+    networks:
+      - default
+      - shared-net
     restart: unless-stopped
+
+networks:
+  default:
+    name: voice-analyzer_default
+  shared-net:
+    external: true
