@@ -805,3 +805,55 @@ echo "Rolled out: ${NEW_TASK_DEF_ARN}"
 - [ ] CI/CD 배포 롤백 절차 문서화
 
 이 구성을 기반으로 시작하면, 현재 레포의 Django + FastAPI + 오디오 분석 워크로드를 운영 환경에 맞게 확장 가능하고 안전하게 배포할 수 있습니다.
+
+---
+
+# ASGI (Asynchronous Server Gateway Interface) 란?
+
+**ASGI**는 **Asynchronous Server Gateway Interface(비동기 서버 게이트웨이 인터페이스)**의 약자입니다. 
+
+쉽게 말해, 파이썬 웹 애플리케이션(FastAPI, Django 등)과 웹 서버(Uvicorn, Daphne 등)가 **서로 비동기적으로 소통할 수 있도록 도와주는 표준 규격(인터페이스)**입니다.
+
+기존에 사용하던 **WSGI(Web Server Gateway Interface)**의 한계를 극복하기 위해 만들어졌습니다.
+
+---
+
+## 💡 왜 ASGI가 필요하게 되었을까요? (WSGI vs ASGI)
+
+과거 파이썬 웹의 표준이었던 WSGI는 **동기적(Synchronous)**으로만 작동했습니다. 즉, 하나의 요청이 들어오면 그 요청이 끝날 때까지 서버가 다른 일을 하지 못하고 기다려야 했습니다.
+
+하지만 현대 웹에서는 실시간 채팅, 알림, 웹소켓(WebSocket)처럼 끊기지 않고 계속 연결을 유지해야 하는 기능이 중요해졌습니다. WSGI는 이러한 **실시간/비동기 처리**를 감당하기 어려웠습니다.
+
+이 문제를 해결하기 위해 등장한 것이 바로 **ASGI**입니다.
+
+### 주요 차이점 비교
+
+| 특징 | WSGI | ASGI |
+| :--- | :--- | :--- |
+| **처리 방식** | 동기 (Synchronous) | **비동기 (Asynchronous) & 동기 모두 지원** |
+| **적합한 작업** | 전통적인 CRUD 웹사이트, REST API | **실시간 채팅, 웹소켓, Long Polling, 대용량 트래픽** |
+| **대표적인 프레임워크** | Django (기본 설정), Flask | **FastAPI**, Sanic, Django Channels |
+| **대표적인 서버** | Gunicorn, uWSGI | **Uvicorn**, Daphne |
+
+---
+
+## 🚀 ASGI의 핵심 장점
+
+1. **비동기(async/await) 지원**
+   - 수많은 요청이 동시에 들어와도 데이터베이스나 외부 API의 응답을 기다리는 동안 다른 요청을 먼저 처리할 수 있어, 서버 효율이 극대화됩니다.
+2. **다양한 프로토콜 지원**
+   - 일반적인 HTTP 요청뿐만 아니라, 연결을 계속 유지해야 하는 **웹소켓(WebSocket)**이나 **HTTP/2** 프로토콜도 완벽하게 지원합니다.
+3. **높은 처리량(Throughput)**
+   - 동시 접속자가 몰리는 상황에서 WSGI보다 훨씬 더 많은 요청을 빠르게 처리할 수 있습니다. (FastAPI가 대단히 빠른 속도를 자랑하는 이유이기도 합니다.)
+
+---
+
+## 🛠️ 자주 함께 쓰이는 조합
+
+현업에서 ASGI를 사용할 때는 보통 다음과 같은 조합으로 서버를 구성합니다.
+
+* **웹 프레임워크:** FastAPI, Django (with Channels)
+* **ASGI 서버:** **Uvicorn** (가장 많이 쓰이는 초고속 ASGI 서버)
+
+> 📌 **요약하자면:**
+> ASGI는 파이썬 웹 생태계에서 **"실시간 소통과 비동기 처리를 가능하게 만들어 준 표준 연결 고리"**라고 생각하시면 됩니다!
